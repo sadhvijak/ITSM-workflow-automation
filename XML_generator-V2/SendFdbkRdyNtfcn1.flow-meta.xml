@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <actionCalls>
+        <description>Calls an action that notifies the survey invitation owner that feedback is ready to be reviewed.</description>
+        <name>NotifyFeedbackSubmissionOwner</name>
+        <label>Notify Feedback Submission Owner</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <actionName>customNotificationAction</actionName>
+        <actionType>customNotificationAction</actionType>
+        <faultConnector>
+            <targetReference>AddOwnerEmailToCollection</targetReference>
+        </faultConnector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>customNotifTypeId</name>
+            <value>
+                <elementReference>FeedbackReadyNotificationType.Id</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>recipientIds</name>
+            <value>
+                <elementReference>RecipientId</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>title</name>
+            <value>
+                <elementReference>NotificationTitle</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>body</name>
+            <value>
+                <elementReference>NotificationBody</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>targetPageRef</name>
+            <value>
+                <elementReference>NotificationTargetPageRef</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>customNotificationAction</nameSegment>
+        <offset>0</offset>
+    </actionCalls>
+    <actionCalls>
+        <description>Sends an email notifying the Enablement program owner when NotifyFeedbackSubmissionOwner fails and a feedback ready notification type doesn&apos;t exist.</description>
+        <name>SendErrorEmailNoNotification</name>
+        <label>Send Error Email</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <actionName>emailSimple</actionName>
+        <actionType>emailSimple</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>emailAddressesArray</name>
+            <value>
+                <elementReference>ErrorEmailRecipient</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailSubject</name>
+            <value>
+                <elementReference>ErrorEmailSubjectTextTemplate</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailBody</name>
+            <value>
+                <elementReference>MissingNotificationTypeErrorBodyTextTemplate</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>emailSimple</nameSegment>
+        <offset>0</offset>
+    </actionCalls>
+    <actionCalls>
+        <description>Sends an error email notification to the Enablement program owner when NotifyFeedbackSubmissionOwner fails, but a feedback ready notification type exists.</description>
+        <name>SendErrorEmailNotificationExists</name>
+        <label>Send Error Email</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <actionName>emailSimple</actionName>
+        <actionType>emailSimple</actionType>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <inputParameters>
+            <name>emailAddressesArray</name>
+            <value>
+                <elementReference>ErrorEmailRecipient</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailSubject</name>
+            <value>
+                <elementReference>ErrorEmailSubjectTextTemplate</elementReference>
+            </value>
+        </inputParameters>
+        <inputParameters>
+            <name>emailBody</name>
+            <value>
+                <elementReference>GenericNotificationErrorBodyTextTemplate</elementReference>
+            </value>
+        </inputParameters>
+        <nameSegment>emailSimple</nameSegment>
+        <offset>0</offset>
+    </actionCalls>
+    <apiVersion>65.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <assignments>
+        <description>Adds the email of the learning item owner to the ErrorEmailRecipient collection.</description>
+        <name>AddOwnerEmailToCollection</name>
+        <label>Add Owner Email to Collection</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>ErrorEmailRecipient</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>LearningPractice.LearningItem.Owner:User.Email</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>DoesNotificationTypeExist</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
+        <description>Adds the user  ID of the owner of the survey invitation associated with recordId to the RecipientId collection.</description>
+        <name>AddOwnerIdToCollection</name>
+        <label>Add Owner ID to Collection</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>RecipientId</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>$Record.Invitation.Owner:User.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>NotifyFeedbackSubmissionOwner</targetReference>
+        </connector>
+    </assignments>
+    <constants>
+        <description>Target that clicking on the notification will navigate to</description>
+        <name>NotificationPageReference</name>
+        <dataType>String</dataType>
+        <value>
+            <stringValue>{&quot;type&quot;:&quot;standard__objectPage&quot;,&quot;attributes&quot;:{&quot;objectApiName&quot;:&quot;EnablementProgram&quot;,&quot;actionName&quot;:&quot;home&quot;},&quot;state&quot;:{&quot;sp&quot;:&quot;t=home&quot;}}</stringValue>
+        </value>
+    </constants>
+    <decisions>
+        <description>Determines whether there&apos;s a record in LearningItemSubmission.</description>
+        <name>DoesLearningItemSubmissionExist</name>
+        <label>Does Learning Item Submission Exist?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnectorLabel>No</defaultConnectorLabel>
+        <rules>
+            <name>HaveLearningItemSubmission</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>LearningItemSubmission.Id</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>GetLearningPractice</targetReference>
+            </connector>
+            <label>Yes</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <description>Determines whether the feedback ready custom notification type record exists.</description>
+        <name>DoesNotificationTypeExist</name>
+        <label>Does Notification Type Exist?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>SendErrorEmailNoNotification</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>No</defaultConnectorLabel>
+        <rules>
+            <name>HaveNotificationType</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>FeedbackReadyNotificationType.Id</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>SendErrorEmailNotificationExists</targetReference>
+            </connector>
+            <label>Yes</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <interviewLabel>SendFdbkRdyNtfcn1 {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>SendFdbkRdyNtfcn1</label>
+    <overriddenFlow>enablement_coaching__SendFdbkRdyNtfcn</overriddenFlow>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordLookups>
+        <description>Gets the custom notification type record with a CustomNotifTypeName of enablement_coaching_feedback_ready. Stores the ID and CustomNotifyTypeName fields of the result in the FeedbackReadyNotificationType record variable.</description>
+        <name>GetCustomNotificationType</name>
+        <label>Get Custom Notification Type</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>AddOwnerIdToCollection</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>CustomNotifTypeName</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>enablement_coaching_feedback_ready</stringValue>
+            </value>
+        </filters>
+        <object>CustomNotificationType</object>
+        <outputReference>FeedbackReadyNotificationType</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>CustomNotifTypeName</queriedFields>
+    </recordLookups>
+    <recordLookups>
+        <description>Gets the learning item submission record with an ID that matches the subject ID of SurveySubject. Stores the ID and LearningItemId of the result in the LearningItemSubmission record variable.</description>
+        <name>GetLearningItemSubmission</name>
+        <label>Get Learning Item Submission</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>DoesLearningItemSubmissionExist</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>SurveySubject.SubjectId</elementReference>
+            </value>
+        </filters>
+        <object>LearningItemSubmission</object>
+        <outputReference>LearningItemSubmission</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>LearningItemId</queriedFields>
+    </recordLookups>
+    <recordLookups>
+        <description>Gets the learning practice record with a LearningItemId that matches the LearningItemId of LearningItemSubmission. Stores the ID, Name, and LearningItemId fields of the result in the LearningPractice record variable.</description>
+        <name>GetLearningPractice</name>
+        <label>Get Learning Practice</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>GetCustomNotificationType</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>LearningItemId</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>LearningItemSubmission.LearningItemId</elementReference>
+            </value>
+        </filters>
+        <object>LearningPractice</object>
+        <outputReference>LearningPractice</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Name</queriedFields>
+        <queriedFields>LearningItemId</queriedFields>
+    </recordLookups>
+    <recordLookups>
+        <description>Gets the survey subject record with a ParentId that matches the ID of the invitation record associated with the survey response record that triggered the flow. Stores the ID and SubjectId fields of the result in the SurveySubject record variable.</description>
+        <name>GetSurveySubject</name>
+        <label>Get Survey Subject</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>GetLearningItemSubmission</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>ParentId</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Invitation.Id</elementReference>
+            </value>
+        </filters>
+        <object>SurveySubject</object>
+        <outputReference>SurveySubject</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>SubjectId</queriedFields>
+    </recordLookups>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <doesRequireRecordChangedToMeetCriteria>true</doesRequireRecordChangedToMeetCriteria>
+        <filterFormula>(TEXT({!$Record.Survey.SurveyType}) = &apos;Assessment&apos;) &amp;&amp; (TEXT({!$Record.Status}) = &apos;Completed&apos;)</filterFormula>
+        <object>SurveyResponse</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <scheduledPaths>
+            <connector>
+                <targetReference>GetSurveySubject</targetReference>
+            </connector>
+            <pathType>AsyncAfterCommit</pathType>
+        </scheduledPaths>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Draft</status>
+    <textTemplates>
+        <description>Stores the text used for the subject of the email send to the Enablement program owner when NotifyFeedbackSubmissionOwner fails.</description>
+        <name>ErrorEmailSubjectTextTemplate</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>Salesforce Feedback Request notification error</text>
+    </textTemplates>
+    <textTemplates>
+        <description>Stores the text used for the body of the email sent to the Enablement program owner when NotifyFeedbackSubmissionOwner fails, but a feedback ready notification type exists.</description>
+        <name>GenericNotificationErrorBodyTextTemplate</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>Hello {!LearningPractice.LearningItem.Owner:User.FirstName}
+
+One or more users who were assigned the Feedback Request exercise didn’t receive their notification that feedback results are ready.
+
+An error occurred in the NotifyFeedbackSubmissionOwner element of the Enablement: Send Feedback Ready Notification flow. Contact your Salesforce admin for help.</text>
+    </textTemplates>
+    <textTemplates>
+        <description>Stores the text used for the body of the email sent to the Enablement program owner when NotifyFeedbackSubmissionOwner fails and a feedback ready notification type doesn&apos;t exist.</description>
+        <name>MissingNotificationTypeErrorBodyTextTemplate</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>Hello {!LearningPractice.LearningItem.Owner:User.FirstName},
+
+One or more users who were assigned the Feedback Request exercise didn’t receive their notification that feedback results are ready.
+
+An error occurred in the NotifyFeedbackSubmissionOwner element of the Enablement: Send Feedback Ready Notification flow. The notification type “enablement_coaching_feedback_ready” couldn’t be found. Contact your Salesforce admin for help.</text>
+    </textTemplates>
+    <textTemplates>
+        <description>Stores the name of the learning practice record associated with the survey response record passed into the flow to use as a body for the notification to the feedback submission owner. To customize the body of the notification sent to the feedback submission owner, change the text here.</description>
+        <name>NotificationBody</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>{!LearningPractice.Name}</text>
+    </textTemplates>
+    <textTemplates>
+        <description>Stores the target page reference used in the notification action.</description>
+        <name>NotificationTargetPageRef</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>{
+   &quot;type&quot;: &quot;standard__objectPage&quot;,
+   &quot;attributes&quot;: {
+      &quot;objectApiName&quot;: &quot;EnablementProgram&quot;,
+      &quot;actionName&quot;: &quot;home&quot;
+   },
+   &quot;state&quot;: {
+      &quot;sp&quot;: &quot;t=co,learningItemId={!LearningPractice.LearningItem.Id},notificationType=FeedbackReady&quot;
+   }
+}</text>
+    </textTemplates>
+    <textTemplates>
+        <description>Stores the text to use as a subject for the notification to the feedback submission owner. To customize the subject of the notification sent to the feedback submission owner, change the text here.</description>
+        <name>NotificationTitle</name>
+        <isViewedAsPlainText>true</isViewedAsPlainText>
+        <text>{!$Record.Name} left you feedback:</text>
+    </textTemplates>
+    <variables>
+        <description>Stores the learning item owner&apos;s email in a collection to be used with an Action element that emails the owner when NotifyFeedbackSubmissionOwner encounters an error.</description>
+        <name>ErrorEmailRecipient</name>
+        <dataType>String</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>Stores the ID and CustomNotifyTypeName fields of the custom notification type record with a CustomNotifTypeName of enablement_coaching_feedback_ready.</description>
+        <name>FeedbackReadyNotificationType</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>CustomNotificationType</objectType>
+    </variables>
+    <variables>
+        <description>Stores the ID and LearningItemId fields of the learning item submission record with an ID that matches the subject ID of SurveySubject.</description>
+        <name>LearningItemSubmission</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>LearningItemSubmission</objectType>
+    </variables>
+    <variables>
+        <description>Stores the ID, Name, and LearningItemId fields of learning practice record with a LearningItemId that matches the LearningItemId of LearningItemSubmission.</description>
+        <name>LearningPractice</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>LearningPractice</objectType>
+    </variables>
+    <variables>
+        <description>Stores the user ID of the owner of the survey invitation associated with the survey response record that triggered the flow in a collection to use as the recipient in NotifyFeedbackSubmissionOwner.</description>
+        <name>RecipientId</name>
+        <dataType>String</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <description>Stores the ID and SubjectId fields of the invitation record associated with the survey response record that triggered the flow.</description>
+        <name>SurveySubject</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>SurveySubject</objectType>
+    </variables>
+</Flow>

@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <decisions>
+        <description>Determines whether isProcessServiceCatalogRequestFailed from the ProcessChangeBillingCycleRequestAndNotifyAccount step of the ProcessChangeBillingCycleRequestAndNotifyStakeholders stage is set to True.</description>
+        <name>HasChangeBillingCycleRequestFailed</name>
+        <label>Has Change Billing Cycle Request Failed?</label>
+        <locationX>248</locationX>
+        <locationY>503</locationY>
+        <defaultConnectorLabel>No (Default)</defaultConnectorLabel>
+        <rules>
+            <name>IsFailed</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>ProcessChangeBillingCycleRequestAndNotifyAccount.Outputs.isProcessServiceCatalogRequestFailed</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>NotifyCaseOwnerOfFailure</targetReference>
+            </connector>
+            <label>Yes</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <description>Determines if the &apos;isRetryConnection&apos; variable in the NotifyCaseOwnerOfFailedRequest is set to True, indicating that the user has chosen to retry the ProcessChangeBillingCycleRequestAndNotifyStakeholders stage.</description>
+        <name>IsRetrySelected</name>
+        <label>Is Retry Selected?</label>
+        <locationX>50</locationX>
+        <locationY>719</locationY>
+        <defaultConnectorLabel>No (Default)</defaultConnectorLabel>
+        <rules>
+            <name>RetrySelected</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>NotifyCaseOwnerOfFailedRequest.Outputs.isRetryConnection</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <isGoTo>true</isGoTo>
+                <targetReference>ProcessChangeBillingCycleRequestAndNotifyStakeholders</targetReference>
+            </connector>
+            <label>Yes</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <interviewLabel>Process Change Billing Cycle1 {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Process Change Billing Cycle1</label>
+    <orchestratedStages>
+        <description>Notifies the case owner that the Change Billing Cycle request failed.</description>
+        <name>NotifyCaseOwnerOfFailure</name>
+        <label>Notify Case Owner of Failure</label>
+        <locationX>50</locationX>
+        <locationY>611</locationY>
+        <connector>
+            <targetReference>IsRetrySelected</targetReference>
+        </connector>
+        <exitConditionLogic>and</exitConditionLogic>
+        <stageSteps>
+            <description>Assigns a work item to the service catalog request record owner that displays a retry screen, notifying them that the Change Billing Cycle request failed.</description>
+            <name>NotifyCaseOwnerOfFailedRequest</name>
+            <actionName>serviceprocess__AsyncApexCalloutSts</actionName>
+            <actionType>stepInteractive</actionType>
+            <assignees>
+                <assignee>
+                    <elementReference>$Record.Case.Owner:User.Username</elementReference>
+                </assignee>
+                <assigneeType>Resource</assigneeType>
+            </assignees>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
+            <inputParameters>
+                <name>status</name>
+                <value>
+                    <elementReference>ProcessChangeBillingCycleRequestAndNotifyAccount.Outputs.failureMessage</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>ActionInput__RecordId</name>
+                <value>
+                    <elementReference>$Record.CaseId</elementReference>
+                </value>
+            </inputParameters>
+            <label>Notify Case Owner of Failed Request</label>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>false</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>InteractiveStep</stepSubtype>
+        </stageSteps>
+    </orchestratedStages>
+    <orchestratedStages>
+        <description>Notifies the account associated with the triggering service catalog request that a Change Billing Cycle request has been made for the account. If your process requires notifying other stakeholders, add more steps to notify them at this stage.</description>
+        <name>NotifyStakeholdersOfRequest</name>
+        <label>Notify Stakeholders of Request</label>
+        <locationX>248</locationX>
+        <locationY>287</locationY>
+        <connector>
+            <targetReference>ProcessChangeBillingCycleRequestAndNotifyStakeholders</targetReference>
+        </connector>
+        <exitConditionLogic>and</exitConditionLogic>
+        <stageSteps>
+            <description>Emails the person associated with the account of the triggering service catalog request record when a Change Billing Cycle request has been made for the account and when the associated email can be determined.</description>
+            <name>NotifyAccountOfChangeBillingCycleRequest</name>
+            <actionName>serviceprocess__ChangeBillingCycle</actionName>
+            <actionType>stepBackground</actionType>
+            <assignees>
+                <assignee>
+                    <elementReference>$Record.Case.Owner:User.Username</elementReference>
+                </assignee>
+                <assigneeType>User</assigneeType>
+            </assignees>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
+            <inputParameters>
+                <name>inputRecordId</name>
+                <value>
+                    <elementReference>$Record.Id</elementReference>
+                </value>
+            </inputParameters>
+            <label>Notify Account of Change Billing Cycle Request</label>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>true</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
+        </stageSteps>
+    </orchestratedStages>
+    <orchestratedStages>
+        <description>Attempts to process a Change Billing Cycle request, closes the case, and notifies the account associated with the triggering service catalog request. If your process requires notifying other stakeholders about the success or change in the case status, add more steps to notify them at this stage.</description>
+        <name>ProcessChangeBillingCycleRequestAndNotifyStakeholders</name>
+        <label>Process Change Billing Cycle Request and Notify Stakeholders</label>
+        <locationX>248</locationX>
+        <locationY>395</locationY>
+        <connector>
+            <targetReference>HasChangeBillingCycleRequestFailed</targetReference>
+        </connector>
+        <exitConditionLogic>and</exitConditionLogic>
+        <stageSteps>
+            <description>Processes a Change Billing Cycle request and, if the request succeeds, closes the associated case. If an email is available and the case is closed, emails the customer to notify them that their request was processed and the case is closed. If the Change Billing Cycle request fails, returns True for isProcessServiceCatalogRequestFailed and an error message for failureMessage.</description>
+            <name>ProcessChangeBillingCycleRequestAndNotifyAccount</name>
+            <actionName>serviceprocess__UpdateCase</actionName>
+            <actionType>stepBackground</actionType>
+            <assignees>
+                <assignee>
+                    <elementReference>$Record.Case.Owner:User.Username</elementReference>
+                </assignee>
+                <assigneeType>User</assigneeType>
+            </assignees>
+            <canAssigneeEdit>false</canAssigneeEdit>
+            <debugSimulateStep>false</debugSimulateStep>
+            <entryConditionLogic>and</entryConditionLogic>
+            <exitConditionLogic>and</exitConditionLogic>
+            <inputParameters>
+                <name>accountEmail</name>
+                <value>
+                    <elementReference>NotifyAccountOfChangeBillingCycleRequest.Outputs.accountEmail</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>caseId</name>
+                <value>
+                    <elementReference>$Record.CaseId</elementReference>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>emailSubjectCaseClosed</name>
+                <value>
+                    <stringValue>Your service request to change billing cycle was closed</stringValue>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>integrationDefinitionDevName</name>
+                <value>
+                    <stringValue>FSCRtl_ChgBillCycl</stringValue>
+                </value>
+            </inputParameters>
+            <inputParameters>
+                <name>recordId</name>
+                <value>
+                    <elementReference>$Record.Id</elementReference>
+                </value>
+            </inputParameters>
+            <label>Process Change Billing Cycle Request and Notify Account</label>
+            <requiresAsyncProcessing>false</requiresAsyncProcessing>
+            <runAsUser>true</runAsUser>
+            <shouldLock>false</shouldLock>
+            <stepSubtype>BackgroundStep</stepSubtype>
+        </stageSteps>
+    </orchestratedStages>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Orchestrator</processType>
+    <runInMode>SystemModeWithoutSharing</runInMode>
+    <sourceTemplate>serviceprocess__ProcessChgBillCycle</sourceTemplate>
+    <start>
+        <locationX>122</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>NotifyStakeholdersOfRequest</targetReference>
+        </connector>
+        <filterFormula>{!$Record.SvcCatalogItemDefinition.DeveloperName}=&apos;FSCRtl_ChangeBillingCycle&apos;</filterFormula>
+        <object>SvcCatalogRequest</object>
+        <recordTriggerType>Create</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>
