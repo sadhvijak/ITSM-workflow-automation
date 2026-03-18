@@ -185,9 +185,19 @@ ctx = Context(agent)
 
 # -------- MAIN FUNCTION --------
 
-def generate_flow_xml(requirement: str) -> str:
+def generate_flow_xml(requirement: str, flow_type_hint: str = "AutoDetect") -> str:
+
+    flow_type_instruction = ""
+
+    if flow_type_hint != "AutoDetect":
+        flow_type_instruction = f"""
+        The Flow type is explicitly: {flow_type_hint}.
+        Follow ONLY rules for this type.
+        Do NOT assume other types.
+        """
 
     agent_query = f"""
+    {flow_type_instruction}
     Analyze Salesforce Flow requirement:
 
     {requirement}
@@ -205,7 +215,7 @@ def generate_flow_xml(requirement: str) -> str:
     pattern_guidance = asyncio.run(run())
 
     prompt = f"""
-Generate Salesforce Flow XML.
+Generate Salesforce {flow_type_hint} Flow XML.
 
 Requirement:
 {requirement}

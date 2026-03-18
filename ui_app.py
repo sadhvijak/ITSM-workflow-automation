@@ -137,7 +137,7 @@ st.set_page_config(page_title="Salesforce Flow Builder", page_icon="⚙️", lay
 #         return False, f"OpenAI generation failed: {e}"
 
 
-def generate_xml_with_rag(requirement: str) -> Tuple[bool, str]:
+def generate_xml_with_rag(requirement: str, flow_type_hint: str) -> Tuple[bool, str]:
     """
     Generate Flow XML using the RAG backend.
     :param requirement: The Salesforce Flow requirement.
@@ -145,7 +145,7 @@ def generate_xml_with_rag(requirement: str) -> Tuple[bool, str]:
     """
     try:
         # Call the RAG backend function to generate XML
-        xml_text = generate_flow_xml(requirement)
+        xml_text = generate_flow_xml(requirement, flow_type_hint)
 
         # Ensure the XML starts with the proper declaration
         if not xml_text.startswith("<?xml"):
@@ -173,11 +173,11 @@ with col1:
     )
 with col2:
     flow_name = st.text_input("Flow API Name (no spaces)", value="MySampleFlow")
-    # flow_type_hint = st.selectbox(
-    #     "Flow type (hint)",
-    #     ["AutoDetect", "Screen", "AutoLaunched", "Record-Triggered"],
-    #     index=0,
-    # )
+    flow_type_hint = st.selectbox(
+        "Flow type (hint)",
+        ["AutoDetect", "Screen", "AutoLaunched", "Record-Triggered"],
+        index=0,
+    )
 
 st.divider()
 
@@ -187,8 +187,8 @@ if "xml_text" not in st.session_state:
     st.session_state.xml_text = ""
 
 if generate_btn:
-    with st.spinner("Generating XML with RAG backend..."):
-        ok, res = generate_xml_with_rag(requirement)
+    with st.spinner("Generating XML with RAG..."):
+        ok, res = generate_xml_with_rag(requirement, flow_type_hint)
     if ok:
         st.session_state.xml_text = res
         st.success("XML generated successfully")
