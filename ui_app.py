@@ -15,12 +15,12 @@ from sample1 import (
     API_VERSION,
 )
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except Exception:
-    OpenAI = None
-    OPENAI_AVAILABLE = False
+# try:
+#     from openai import OpenAI
+#     OPENAI_AVAILABLE = True
+# except Exception:
+#     OpenAI = None
+#     OPENAI_AVAILABLE = False
 
 from RAG_backend_react2 import generate_flow_xml 
 
@@ -28,116 +28,116 @@ load_dotenv()
 
 st.set_page_config(page_title="Salesforce Flow Builder", page_icon="⚙️", layout="wide")
 
-def generate_xml_with_openai(requirement: str, flow_type_hint: Optional[str] = None) -> Tuple[bool, str]:
-    """Generate Flow XML using OpenAI. Returns (ok, xml_or_error)."""
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not OPENAI_AVAILABLE or not api_key:
-        return False, "OpenAI client or OPENAI_API_KEY not configured. Please set OPENAI_API_KEY in your .env."
+# def generate_xml_with_openai(requirement: str, flow_type_hint: Optional[str] = None) -> Tuple[bool, str]:
+#     """Generate Flow XML using OpenAI. Returns (ok, xml_or_error)."""
+#     api_key = os.getenv("OPENAI_API_KEY", "").strip()
+#     if not OPENAI_AVAILABLE or not api_key:
+#         return False, "OpenAI client or OPENAI_API_KEY not configured. Please set OPENAI_API_KEY in your .env."
 
-    client = OpenAI(api_key=api_key)
+#     client = OpenAI(api_key=api_key)
 
-    record_trigger_keywords = [
-        "record-triggered",
-        "record triggered",
-        "before save",
-        "after save",
-        "$record",
-        "$record__prior",
-        "on create",
-        "on update",
-        "on delete",
-    ]
-    screen_keywords = ["screen", "user", "input", "display", "wizard", "ui"]
+#     record_trigger_keywords = [
+#         "record-triggered",
+#         "record triggered",
+#         "before save",
+#         "after save",
+#         "$record",
+#         "$record__prior",
+#         "on create",
+#         "on update",
+#         "on delete",
+#     ]
+#     screen_keywords = ["screen", "user", "input", "display", "wizard", "ui"]
 
-    normalized_hint = None if flow_type_hint in {None, "AutoDetect"} else flow_type_hint
-    if normalized_hint in {"Screen", "AutoLaunched", "Record-Triggered"}:
-        flow_type = normalized_hint
-    else:
-        requirement_lower = requirement.lower()
-        if any(keyword in requirement_lower for keyword in record_trigger_keywords):
-            flow_type = "Record-Triggered"
-        elif any(keyword in requirement_lower for keyword in screen_keywords):
-            flow_type = "Screen"
-        else:
-            flow_type = "AutoLaunched"
+#     normalized_hint = None if flow_type_hint in {None, "AutoDetect"} else flow_type_hint
+#     if normalized_hint in {"Screen", "AutoLaunched", "Record-Triggered"}:
+#         flow_type = normalized_hint
+#     else:
+#         requirement_lower = requirement.lower()
+#         if any(keyword in requirement_lower for keyword in record_trigger_keywords):
+#             flow_type = "Record-Triggered"
+#         elif any(keyword in requirement_lower for keyword in screen_keywords):
+#             flow_type = "Screen"
+#         else:
+#             flow_type = "AutoLaunched"
 
-    flow_type_display = {
-        "Screen": "Screen",
-        "AutoLaunched": "Auto-Launched",
-        "Record-Triggered": "Record-Triggered",
-    }.get(flow_type, flow_type)
+#     flow_type_display = {
+#         "Screen": "Screen",
+#         "AutoLaunched": "Auto-Launched",
+#         "Record-Triggered": "Record-Triggered",
+#     }.get(flow_type, flow_type)
 
-    flow_guidance = {
-        "Screen": """
-CRITICAL SCREEN FLOW RULES:
-- Use <fields> (not <screenFields>) with <fieldText>
-- fieldType values must follow enum casing (DisplayText, Text, etc.)
-- Provide locationX/locationY for every element
-- Ensure connectors form a valid path from <start>
-""".strip(),
-        "AutoLaunched": """
-CRITICAL AUTO-LAUNCHED FLOW RULES:
-- Validate <start> trigger metadata when present
-- All record operations (recordLookups/Creates/Updates) need <object>
-- Provide <filterLogic> when 2+ <filters> exist
-- Finalize connectors so every branch reaches an end element
-""".strip(),
-        "Record-Triggered": """
-CRITICAL RECORD-TRIGGERED FLOW RULES:
-- <processType> must be AutoLaunchedFlow
-- <start> requires <object>, <recordTriggerType>, and <triggerType>
-- Align triggerType (RecordBeforeSave/RecordAfterSave) with automation intent
-- Use $Record__Prior only for update triggers
-- Keep locationX/locationY + connector ordering inside <start>
-""".strip(),
-    }
+#     flow_guidance = {
+#         "Screen": """
+# CRITICAL SCREEN FLOW RULES:
+# - Use <fields> (not <screenFields>) with <fieldText>
+# - fieldType values must follow enum casing (DisplayText, Text, etc.)
+# - Provide locationX/locationY for every element
+# - Ensure connectors form a valid path from <start>
+# """.strip(),
+#         "AutoLaunched": """
+# CRITICAL AUTO-LAUNCHED FLOW RULES:
+# - Validate <start> trigger metadata when present
+# - All record operations (recordLookups/Creates/Updates) need <object>
+# - Provide <filterLogic> when 2+ <filters> exist
+# - Finalize connectors so every branch reaches an end element
+# """.strip(),
+#         "Record-Triggered": """
+# CRITICAL RECORD-TRIGGERED FLOW RULES:
+# - <processType> must be AutoLaunchedFlow
+# - <start> requires <object>, <recordTriggerType>, and <triggerType>
+# - Align triggerType (RecordBeforeSave/RecordAfterSave) with automation intent
+# - Use $Record__Prior only for update triggers
+# - Keep locationX/locationY + connector ordering inside <start>
+# """.strip(),
+#     }
 
-    guidance_block = flow_guidance.get(flow_type, "")
-    if guidance_block:
-        guidance_block = guidance_block + "\n\n"
+#     guidance_block = flow_guidance.get(flow_type, "")
+#     if guidance_block:
+#         guidance_block = guidance_block + "\n\n"
 
-    prompt = f"""
-Generate valid Salesforce {flow_type_display} Flow XML for: "{requirement}"
+#     prompt = f"""
+# Generate valid Salesforce {flow_type_display} Flow XML for: "{requirement}"
 
-{guidance_block}CRITICAL XML VALIDATION - 7-Check Process:
-1. Correct tag name (exact case, exists in schema)
-2. Required children present (no missing/invented tags)
-3. Correct parent placement (proper nesting)
-4. Child tag order (name → label → locationX → locationY → others)
-5. Position constraints (locationX/locationY on ALL elements)
-6. Tag compatibility (follow co-occurrence rules)
-7. Exact enum values (PascalCase)
+# {guidance_block}CRITICAL XML VALIDATION - 7-Check Process:
+# 1. Correct tag name (exact case, exists in schema)
+# 2. Required children present (no missing/invented tags)
+# 3. Correct parent placement (proper nesting)
+# 4. Child tag order (name → label → locationX → locationY → others)
+# 5. Position constraints (locationX/locationY on ALL elements)
+# 6. Tag compatibility (follow co-occurrence rules)
+# 7. Exact enum values (PascalCase)
 
-OUTPUT:
-- Return ONLY XML (no markdown, no explanations)
-- Start: <?xml version="1.0" encoding="UTF-8"?>
-- Namespace: xmlns="http://soap.sforce.com/2006/04/metadata"
-- 4-space indentation
-- Schema-compliant, deployment-ready
-"""
+# OUTPUT:
+# - Return ONLY XML (no markdown, no explanations)
+# - Start: <?xml version="1.0" encoding="UTF-8"?>
+# - Namespace: xmlns="http://soap.sforce.com/2006/04/metadata"
+# - 4-space indentation
+# - Schema-compliant, deployment-ready
+# """
 
-    try:
-        resp = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": f"You are a Salesforce {flow_type_display} Flow XML generator. Produce deployment-ready metadata XML."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-        )
-        xml_text = resp.choices[0].message.content.strip()
-        if xml_text.startswith("```xml"):
-            xml_text = xml_text.split("```xml", 1)[1].split("```", 1)[0].strip()
-        elif xml_text.startswith("```"):
-            xml_text = xml_text.split("```", 1)[1].split("```", 1)[0].strip()
-        if not xml_text.startswith("<?xml"):
-            xml_text = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_text
-        return True, xml_text
-    except Exception as e:
-        return False, f"OpenAI generation failed: {e}"
+#     try:
+#         resp = client.chat.completions.create(
+#             model="gpt-4o",
+#             messages=[
+#                 {"role": "system", "content": f"You are a Salesforce {flow_type_display} Flow XML generator. Produce deployment-ready metadata XML."},
+#                 {"role": "user", "content": prompt},
+#             ],
+#             temperature=0.1,
+#         )
+#         xml_text = resp.choices[0].message.content.strip()
+#         if xml_text.startswith("```xml"):
+#             xml_text = xml_text.split("```xml", 1)[1].split("```", 1)[0].strip()
+#         elif xml_text.startswith("```"):
+#             xml_text = xml_text.split("```", 1)[1].split("```", 1)[0].strip()
+#         if not xml_text.startswith("<?xml"):
+#             xml_text = '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_text
+#         return True, xml_text
+#     except Exception as e:
+#         return False, f"OpenAI generation failed: {e}"
 
 
-def generate_xml_with_rag(requirement: str) -> Tuple[bool, str]:
+def generate_xml_with_rag(requirement: str, flow_type_hint: str) -> Tuple[bool, str]:
     """
     Generate Flow XML using the RAG backend.
     :param requirement: The Salesforce Flow requirement.
@@ -145,7 +145,7 @@ def generate_xml_with_rag(requirement: str) -> Tuple[bool, str]:
     """
     try:
         # Call the RAG backend function to generate XML
-        xml_text = generate_flow_xml(requirement)
+        xml_text = generate_flow_xml(requirement, flow_type_hint)
 
         # Ensure the XML starts with the proper declaration
         if not xml_text.startswith("<?xml"):
@@ -153,7 +153,7 @@ def generate_xml_with_rag(requirement: str) -> Tuple[bool, str]:
 
         return True, xml_text
     except Exception as e:
-        return False, f"Error generating XML: {e}"
+        return False, f"Error generating XML: {str(e)}"
 
 
 st.title("Salesforce Flow XML Generator & Deployer")
@@ -187,8 +187,8 @@ if "xml_text" not in st.session_state:
     st.session_state.xml_text = ""
 
 if generate_btn:
-    with st.spinner("Generating XML with RAG backend..."):
-        ok, res = generate_xml_with_rag(requirement)
+    with st.spinner("Generating XML with RAG..."):
+        ok, res = generate_xml_with_rag(requirement, flow_type_hint)
     if ok:
         st.session_state.xml_text = res
         st.success("XML generated successfully")

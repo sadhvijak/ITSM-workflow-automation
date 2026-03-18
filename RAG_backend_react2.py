@@ -145,35 +145,34 @@ query_engine_tools = [
 print(" Initializing ReAct Agent...")
 
 system_prompt = """You are a Salesforce Flow XML architecture expert. Your job is to gather 
-ALL necessary XML patterns and structural information to help generate valid Salesforce Flow XML.
+ALL necessary XML patterns and structural information to help generate valid Salesforce Flow XML."""
 
-When given a requirement, SYSTEMATICALLY query these pattern types:
+# When given a requirement, SYSTEMATICALLY query these pattern types:
 
-1. **Element Templates** - Base structure (CRITICAL: fields vs screenFields, fieldText vs label)
-2. **Parent-Child Relationships** - Nesting hierarchies
-3. **Child Ordering Rules** - EXACT child tag ordering (name → label → locationX → locationY)
-4. **XML Examples** - Concrete working examples
-5. **Attribute Enums** - Valid enum values (DisplayText not Label, EqualTo not equals)
-6. **Co-occurrence Rules** - Elements that must/cannot appear together
-7. **Context Patterns** - Context-specific variations
-8. **Sequence Templates** - Flow-level element ordering
-9. **Positional Constraints** - locationX/locationY requirements and spacing
+# 1. **Element Templates** - Base structure (CRITICAL: fields vs screenFields, fieldText vs label)
+# 2. **Parent-Child Relationships** - Nesting hierarchies
+# 3. **Child Ordering Rules** - EXACT child tag ordering (name → label → locationX → locationY)
+# 4. **XML Examples** - Concrete working examples
+# 5. **Attribute Enums** - Valid enum values (DisplayText not Label, EqualTo not equals)
+# 6. **Co-occurrence Rules** - Elements that must/cannot appear together
+# 7. **Context Patterns** - Context-specific variations
+# 8. **Sequence Templates** - Flow-level element ordering
+# 9. **Positional Constraints** - locationX/locationY requirements and spacing
 
-CRITICAL SCREEN FLOW RULES TO VERIFY:
-- Use <fields> NOT <screenFields>
-- Use <fieldText> NOT <label> inside fields
-- Use DisplayText NOT Label as fieldType
-- locationX/locationY REQUIRED for ALL elements
-- Order: name → label → locationX → locationY → other tags
+# CRITICAL SCREEN FLOW RULES TO VERIFY:
+# - Use <fields> NOT <screenFields>
+# - Use <fieldText> NOT <label> inside fields
+# - Use DisplayText NOT Label as fieldType
+# - locationX/locationY REQUIRED for ALL elements
+# - Order: name → label → locationX → locationY → other tags
 
-RECORD-TRIGGERED FLOW KEY CHECKS:
-- <processType> must be AutoLaunchedFlow
-- <start> must include <object>, <recordTriggerType>, and <triggerType>
-- Align <triggerType> (RecordBeforeSave/RecordAfterSave) with automation requirements
-- Validate $Record/$Record__Prior usage and entry filter configuration
+# RECORD-TRIGGERED FLOW KEY CHECKS:
+# - <processType> must be AutoLaunchedFlow
+# - <start> must include <object>, <recordTriggerType>, and <triggerType>
+# - Align <triggerType> (RecordBeforeSave/RecordAfterSave) with automation requirements
+# - Validate $Record/$Record__Prior usage and entry filter configuration
 
-Be thorough - query every relevant tool!
-"""
+# Be thorough - query every relevant tool!
 
 agent = ReActAgent(
     tools=query_engine_tools,
@@ -184,9 +183,68 @@ agent = ReActAgent(
 
 ctx = Context(agent)
 
-requirement = input("\n Enter your Salesforce Flow requirement:\n> ")
+# -------- MAIN FUNCTION --------
 
-requirement_lower = requirement.lower()
+def generate_flow_xml(requirement: str, flow_type_hint: str = "AutoDetect") -> str:
+
+    flow_type_instruction = ""
+
+    if flow_type_hint != "AutoDetect":
+        flow_type_instruction = f"""
+        The Flow type is explicitly: {flow_type_hint}.
+        Follow ONLY rules for this type.
+        Do NOT assume other types.
+        """
+
+    agent_query = f"""
+    {flow_type_instruction}
+    Analyze Salesforce Flow requirement:
+
+    {requirement}
+
+    Retrieve all necessary XML patterns and constraints.
+    """
+
+    import asyncio
+
+    async def run():
+        handler = agent.run(agent_query, ctx=ctx)
+        response = await handler
+        return str(response)
+
+    pattern_guidance = asyncio.run(run())
+
+    prompt = f"""
+Generate Salesforce {flow_type_hint} Flow XML.
+
+Requirement:
+{requirement}
+
+Patterns:
+{pattern_guidance}
+
+Return ONLY valid XML.
+"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        temperature=0.1,
+        messages=[
+            {"role": "system", "content": "You generate Salesforce Flow XML."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    xml = response.choices[0].message.content.strip()
+
+    if xml.startswith("```xml"):
+        xml = xml.split("```xml")[1].split("```")[0].strip()
+
+    return xml
+
+# requirement = input("\n Enter your Salesforce Flow requirement:\n> ")
+
+# requirement_lower = requirement.lower()
 
 # record_trigger_keywords = [
 #     "record-triggered",
@@ -213,634 +271,634 @@ requirement_lower = requirement.lower()
 #     flow_type = "AutoLaunched"
 
 
-record_trigger_keywords = [
-    "record-triggered",
-    "record triggered",
-    "before save",
-    "after save",
-    "after-save",
-    "before-save",
-    "triggered on record",
-    "$record",
-    "$record__prior",
-    "on create",
-    "on update",
-    "on delete"
-]
+# record_trigger_keywords = [
+#     "record-triggered",
+#     "record triggered",
+#     "before save",
+#     "after save",
+#     "after-save",
+#     "before-save",
+#     "triggered on record",
+#     "$record",
+#     "$record__prior",
+#     "on create",
+#     "on update",
+#     "on delete"
+# ]
 
-screen_keywords = [
-    "screen flow",
-    "screen-flow", 
-    "display screen",
-    "show screen",
-    "user interface",
-    "wizard",
-    "collect input",
-    "show message to user"
-]
+# screen_keywords = [
+#     "screen flow",
+#     "screen-flow", 
+#     "display screen",
+#     "show screen",
+#     "user interface",
+#     "wizard",
+#     "collect input",
+#     "show message to user"
+# ]
 
-autolaunched_keywords = [
-    "auto-launched",
-    "autolaunched",
-    "auto launched",
-    "takes a",
-    "accepts a",
-    "takes an",
-    "accepts an",
-    "case id",
-    "record id",
-    "opportunity id",
-    "account id",
-    "invocable",
-    "background",
-    "no user interaction",
-    "input variable",
-    "input parameter"
-]
+# autolaunched_keywords = [
+#     "auto-launched",
+#     "autolaunched",
+#     "auto launched",
+#     "takes a",
+#     "accepts a",
+#     "takes an",
+#     "accepts an",
+#     "case id",
+#     "record id",
+#     "opportunity id",
+#     "account id",
+#     "invocable",
+#     "background",
+#     "no user interaction",
+#     "input variable",
+#     "input parameter"
+# ]
 
-if any(keyword in requirement_lower for keyword in record_trigger_keywords):
-    flow_type = "Record-Triggered"
-elif any(keyword in requirement_lower for keyword in autolaunched_keywords):
-    flow_type = "AutoLaunched"
-elif any(keyword in requirement_lower for keyword in screen_keywords):
-    flow_type = "Screen"
-else:
-    flow_type = "AutoLaunched"
+# if any(keyword in requirement_lower for keyword in record_trigger_keywords):
+#     flow_type = "Record-Triggered"
+# elif any(keyword in requirement_lower for keyword in autolaunched_keywords):
+#     flow_type = "AutoLaunched"
+# elif any(keyword in requirement_lower for keyword in screen_keywords):
+#     flow_type = "Screen"
+# else:
+#     flow_type = "AutoLaunched"
 
-flow_type_display_map = {
-    "Screen": "Screen",
-    "AutoLaunched": "Auto-Launched",
-    "Record-Triggered": "Record-Triggered"
-}
-flow_type_display = flow_type_display_map.get(flow_type, flow_type)
+# flow_type_display_map = {
+#     "Screen": "Screen",
+#     "AutoLaunched": "Auto-Launched",
+#     "Record-Triggered": "Record-Triggered"
+# }
+# flow_type_display = flow_type_display_map.get(flow_type, flow_type)
 
-print(f"\n Detected flow type: {flow_type_display}")
+# print(f"\n Detected flow type: {flow_type_display}")
 
 # === Use ReAct Agent to retrieve patterns ===
-print(f"\n ReAct Agent analyzing {flow_type_display} Flow requirement...")
-print("=" * 60)
+# print(f"\n ReAct Agent analyzing {flow_type_display} Flow requirement...")
+# print("=" * 60)
 
-agent_query = f"""
-Analyze this Salesforce {flow_type_display} Flow requirement and gather ALL necessary XML patterns:
+# agent_query = f"""
+# Analyze this Salesforce {flow_type_display} Flow requirement and gather ALL necessary XML patterns:
 
-REQUIREMENT: {requirement}
+# REQUIREMENT: {requirement}
 
-Please systematically query ALL relevant pattern types:
-...
-Be thorough!
-"""
+# Please systematically query ALL relevant pattern types:
+# ...
+# Be thorough!
+# """
 
-# WITH THIS
-agent_query = f"""
-You are analyzing this Salesforce {flow_type_display} Flow requirement:
-"{requirement}"
+# # WITH THIS
+# agent_query = f"""
+# You are analyzing this Salesforce {flow_type_display} Flow requirement:
+# "{requirement}"
 
-You MUST query each tool with SPECIFIC element names listed below.
-DO NOT use "Auto-Launched Flow" or "Screen Flow" as query inputs — they return nothing useful.
-Query EXACTLY these inputs in order:
+# You MUST query each tool with SPECIFIC element names listed below.
+# DO NOT use "Auto-Launched Flow" or "Screen Flow" as query inputs — they return nothing useful.
+# Query EXACTLY these inputs in order:
 
-1.  element_templates_tool       → input: "recordLookups element structure"
-2.  element_templates_tool       → input: "decisions element structure"
-3.  element_templates_tool       → input: "recordUpdates element structure"
-4.  element_templates_tool       → input: "recordCreates element structure"
-5.  element_templates_tool       → input: "assignments element structure"
-6.  element_templates_tool       → input: "variables element structure"
-7.  child_ordering_rules_tool    → input: "recordLookups child order"
-8.  child_ordering_rules_tool    → input: "decisions child order"
-9.  child_ordering_rules_tool    → input: "recordUpdates child order"
-10. child_ordering_rules_tool    → input: "Flow root child order"
-11. xml_examples_tool            → input: "recordLookups XML example"
-12. xml_examples_tool            → input: "decisions rules conditions XML"
-13. xml_examples_tool            → input: "recordUpdates inputAssignments XML"
-14. attribute_enums_tool         → input: "operator EqualTo NotEqualTo GreaterThan IsNull"
-15. attribute_enums_tool         → input: "processType AutoLaunchedFlow"
-16. attribute_enums_tool         → input: "dataType String Boolean Number Date"
-17. cooccurrence_rules_tool      → input: "recordLookups filters filterLogic object"
-18. cooccurrence_rules_tool      → input: "decisions rules defaultConnector"
-19. parent_child_relationships_tool → input: "decisions rules"
-20. parent_child_relationships_tool → input: "recordLookups filters"
-21. sequence_templates_tool      → input: "Flow root element sequence"
-22. positional_constraints_tool  → input: "locationX locationY element spacing"
+# 1.  element_templates_tool       → input: "recordLookups element structure"
+# 2.  element_templates_tool       → input: "decisions element structure"
+# 3.  element_templates_tool       → input: "recordUpdates element structure"
+# 4.  element_templates_tool       → input: "recordCreates element structure"
+# 5.  element_templates_tool       → input: "assignments element structure"
+# 6.  element_templates_tool       → input: "variables element structure"
+# 7.  child_ordering_rules_tool    → input: "recordLookups child order"
+# 8.  child_ordering_rules_tool    → input: "decisions child order"
+# 9.  child_ordering_rules_tool    → input: "recordUpdates child order"
+# 10. child_ordering_rules_tool    → input: "Flow root child order"
+# 11. xml_examples_tool            → input: "recordLookups XML example"
+# 12. xml_examples_tool            → input: "decisions rules conditions XML"
+# 13. xml_examples_tool            → input: "recordUpdates inputAssignments XML"
+# 14. attribute_enums_tool         → input: "operator EqualTo NotEqualTo GreaterThan IsNull"
+# 15. attribute_enums_tool         → input: "processType AutoLaunchedFlow"
+# 16. attribute_enums_tool         → input: "dataType String Boolean Number Date"
+# 17. cooccurrence_rules_tool      → input: "recordLookups filters filterLogic object"
+# 18. cooccurrence_rules_tool      → input: "decisions rules defaultConnector"
+# 19. parent_child_relationships_tool → input: "decisions rules"
+# 20. parent_child_relationships_tool → input: "recordLookups filters"
+# 21. sequence_templates_tool      → input: "Flow root element sequence"
+# 22. positional_constraints_tool  → input: "locationX locationY element spacing"
 
-After querying ALL of the above, summarize:
-- Exact child element order for each element
-- Valid enum values found
-- Required vs optional children
-- Any XML examples retrieved
-"""
+# After querying ALL of the above, summarize:
+# - Exact child element order for each element
+# - Valid enum values found
+# - Required vs optional children
+# - Any XML examples retrieved
+# """
 
-try:
-    import asyncio
+# try:
+#     import asyncio
     
-    async def run_agent():
-        handler = agent.run(agent_query, ctx=ctx)
+#     async def run_agent():
+#         handler = agent.run(agent_query, ctx=ctx)
         
-        async for ev in handler.stream_events():
-            from llama_index.core.agent.workflow import AgentStream, ToolCallResult
-            if isinstance(ev, ToolCallResult):
-                print(f"\n Tool: {ev.tool_name}")
-                print(f"   Input: {str(ev.tool_kwargs)[:100]}...")
-            elif isinstance(ev, AgentStream):
-                print(ev.delta, end="", flush=True)
+#         async for ev in handler.stream_events():
+#             from llama_index.core.agent.workflow import AgentStream, ToolCallResult
+#             if isinstance(ev, ToolCallResult):
+#                 print(f"\n Tool: {ev.tool_name}")
+#                 print(f"   Input: {str(ev.tool_kwargs)[:100]}...")
+#             elif isinstance(ev, AgentStream):
+#                 print(ev.delta, end="", flush=True)
         
-        return await handler
+#         return await handler
     
-    agent_response = asyncio.run(run_agent())
-    pattern_guidance = str(agent_response)
+#     agent_response = asyncio.run(run_agent())
+#     pattern_guidance = str(agent_response)
     
-    print("\n" + "=" * 60)
-    print(" Agent analysis complete\n")
+#     print("\n" + "=" * 60)
+#     print(" Agent analysis complete\n")
     
-except Exception as e:
-    print(f" Error running ReAct agent: {e}")
-    print("Falling back to direct pattern retrieval...")
-    response = general_query_engine.query(requirement)
-    pattern_guidance = str(response)
+# except Exception as e:
+#     print(f" Error running ReAct agent: {e}")
+#     print("Falling back to direct pattern retrieval...")
+#     response = general_query_engine.query(requirement)
+#     pattern_guidance = str(response)
 
-# === Build flow-type-specific validation rules ===
-if flow_type == "Screen":
-    flow_specific_rules = """
-**SCREEN FLOW CRITICAL RULES:**
+# # === Build flow-type-specific validation rules ===
+# if flow_type == "Screen":
+#     flow_specific_rules = """
+# **SCREEN FLOW CRITICAL RULES:**
 
-1. **Tag Names (CRITICAL):**
-    Use <fields> NOT <screenFields>
-    Use <fieldText> NOT <label> for field text
-    Use DisplayText NOT Label for fieldType
+# 1. **Tag Names (CRITICAL):**
+#     Use <fields> NOT <screenFields>
+#     Use <fieldText> NOT <label> for field text
+#     Use DisplayText NOT Label for fieldType
 
-2. **ProcessType:**
-    Must be "Flow"
+# 2. **ProcessType:**
+#     Must be "Flow"
 
-3. **locationX/locationY (MANDATORY):**
-   - EVERY element MUST have both tags
-   - Placement: name → label → locationX → locationY → other tags
-   - Standard spacing: 176px horizontal, 158px vertical
-   - Start: locationX=50, locationY=0
+# 3. **locationX/locationY (MANDATORY):**
+#    - EVERY element MUST have both tags
+#    - Placement: name → label → locationX → locationY → other tags
+#    - Standard spacing: 176px horizontal, 158px vertical
+#    - Start: locationX=50, locationY=0
 
-4. **Connector Rules:**
-   - Use <connector><targetReference>NextElement</targetReference></connector>
-   - NO <label> inside <connector>
+# 4. **Connector Rules:**
+#    - Use <connector><targetReference>NextElement</targetReference></connector>
+#    - NO <label> inside <connector>
 
-5. **Valid FieldTypes:**
-   DisplayText, InputField, RadioButtons, DropdownBox, LargeTextArea,
-   PasswordField, CheckboxGroup, ComponentInstance
+# 5. **Valid FieldTypes:**
+#    DisplayText, InputField, RadioButtons, DropdownBox, LargeTextArea,
+#    PasswordField, CheckboxGroup, ComponentInstance
 
-6. CRITICAL: Screen Flows ALWAYS require a <start> element with a connector
+# 6. CRITICAL: Screen Flows ALWAYS require a <start> element with a connector
 
-The <start> element MUST include:
+# The <start> element MUST include:
 
-<locationX>50</locationX>
-<locationY>0</locationY>
-<connector> with <targetReference> pointing to the FIRST screen
+# <locationX>50</locationX>
+# <locationY>0</locationY>
+# <connector> with <targetReference> pointing to the FIRST screen
 
-REQUIRED STRUCTURE:
-<start>
-        <locationX>50</locationX>
-        <locationY>0</locationY>
-        <connector>
-            <targetReference>FirstScreenName</targetReference>
-        </connector>
-    </start>
+# REQUIRED STRUCTURE:
+# <start>
+#         <locationX>50</locationX>
+#         <locationY>0</locationY>
+#         <connector>
+#             <targetReference>FirstScreenName</targetReference>
+#         </connector>
+#     </start>
 
-7. Element Connection Rules:
+# 7. Element Connection Rules:
 
-    MUST HAVE CONNECTORS (non-terminal elements):
+#     MUST HAVE CONNECTORS (non-terminal elements):
 
-    -<start> - ALWAYS needs connector to first element (CRITICAL)
-    -<screens> - Needs connector UNLESS it's the final screen
-    -<decisions> - Each outcome path needs connector (except default can end)
-    -<assignments> - Always needs connector
-    -<recordLookups> - Always needs connector
-    -<recordUpdates> - Needs connector unless flow ends
-    -<recordCreates> - Needs connector unless flow ends
-    -<subflows> - Always needs connector
-    -<loops> - Loop body needs connectors
+#     -<start> - ALWAYS needs connector to first element (CRITICAL)
+#     -<screens> - Needs connector UNLESS it's the final screen
+#     -<decisions> - Each outcome path needs connector (except default can end)
+#     -<assignments> - Always needs connector
+#     -<recordLookups> - Always needs connector
+#     -<recordUpdates> - Needs connector unless flow ends
+#     -<recordCreates> - Needs connector unless flow ends
+#     -<subflows> - Always needs connector
+#     -<loops> - Loop body needs connectors
 
-CAN BE UNCONNECTED (terminal elements):
+# CAN BE UNCONNECTED (terminal elements):
 
- -Final <screens> element (user clicks Finish, flow ends)
- -<recordDeletes> at flow end
- -Decision outcomes that intentionally end the flow
- -Elements after which flow should terminate
+#  -Final <screens> element (user clicks Finish, flow ends)
+#  -<recordDeletes> at flow end
+#  -Decision outcomes that intentionally end the flow
+#  -Elements after which flow should terminate
 
-ERROR PATTERNS:
+# ERROR PATTERNS:
 
- -"Start element not connected" = Missing <connector> in <start> ← YOUR ERROR
- -"Element X has no path" = Middle element missing connector
- -"Unreachable element" = Element exists but nothing points to it
+#  -"Start element not connected" = Missing <connector> in <start> ← YOUR ERROR
+#  -"Element X has no path" = Middle element missing connector
+#  -"Unreachable element" = Element exists but nothing points to it
 
-VALIDATION CHECKLIST:
- -<start> element has <connector> with <targetReference>
- -<targetReference> matches first screen's <name> exactly
- -Every middle element has connector to next element
- -Flow has at least one terminal element (endpoint)
+# VALIDATION CHECKLIST:
+#  -<start> element has <connector> with <targetReference>
+#  -<targetReference> matches first screen's <name> exactly
+#  -Every middle element has connector to next element
+#  -Flow has at least one terminal element (endpoint)
 
  
-EXAMPLES:
+# EXAMPLES:
 
-**Example 1: Simple Screen with Input Field**
-```xml
-<screens>
-    <name>Screen1</name>
-    <label>Enter Information</label>
-    <locationX>50</locationX>  <!--  REQUIRED -->
-    <locationY>0</locationY>   <!--  REQUIRED -->
-    <fields>  <!--  Correct tag name -->
-        <name>inputField1</name>
-        <dataType>String</dataType>
-        <fieldText>Enter your name</fieldText>  <!--  Use fieldText -->
-        <fieldType>InputField</fieldType>
-        <isRequired>false</isRequired>
-    </fields>
-    <allowBack>true</allowBack>
-    <allowFinish>true</allowFinish>
-    <allowPause>false</allowPause>
-</screens>
-```
+# **Example 1: Simple Screen with Input Field**
+# ```xml
+# <screens>
+#     <name>Screen1</name>
+#     <label>Enter Information</label>
+#     <locationX>50</locationX>  <!--  REQUIRED -->
+#     <locationY>0</locationY>   <!--  REQUIRED -->
+#     <fields>  <!--  Correct tag name -->
+#         <name>inputField1</name>
+#         <dataType>String</dataType>
+#         <fieldText>Enter your name</fieldText>  <!--  Use fieldText -->
+#         <fieldType>InputField</fieldType>
+#         <isRequired>false</isRequired>
+#     </fields>
+#     <allowBack>true</allowBack>
+#     <allowFinish>true</allowFinish>
+#     <allowPause>false</allowPause>
+# </screens>
+# ```
 
-**Example 2: Screen with Display Text**
-```xml
-<screens>
-    <name>WelcomeScreen</name>
-    <label>Welcome</label>
-    <locationX>50</locationX>   <!--  REQUIRED -->
-    <locationY>158</locationY>  <!--  REQUIRED (below first screen) -->
-    <fields>
-        <name>displayText1</name>
-        <fieldText>Welcome to the flow!</fieldText>
-        <fieldType>DisplayText</fieldType>  <!-- Use DisplayText, not Label -->
-    </fields>
-    <allowBack>true</allowBack>
-    <allowFinish>true</allowFinish>
-    <allowPause>false</allowPause>
-</screens>
-```
+# **Example 2: Screen with Display Text**
+# ```xml
+# <screens>
+#     <name>WelcomeScreen</name>
+#     <label>Welcome</label>
+#     <locationX>50</locationX>   <!--  REQUIRED -->
+#     <locationY>158</locationY>  <!--  REQUIRED (below first screen) -->
+#     <fields>
+#         <name>displayText1</name>
+#         <fieldText>Welcome to the flow!</fieldText>
+#         <fieldType>DisplayText</fieldType>  <!-- Use DisplayText, not Label -->
+#     </fields>
+#     <allowBack>true</allowBack>
+#     <allowFinish>true</allowFinish>
+#     <allowPause>false</allowPause>
+# </screens>
+# ```
 
-**Example 3: Decision Element**
-```xml
-<decisions>
-    <name>CheckValue</name>
-    <label>Check Value</label>
-    <locationX>50</locationX>   <!--  REQUIRED -->
-    <locationY>316</locationY>  <!--  REQUIRED -->
-    <defaultConnector>
-        <targetReference>DefaultScreen</targetReference>
-    </defaultConnector>
-    <rules>
-        <name>IsValid</name>
-        <conditionLogic>and</conditionLogic>
-        <conditions>
-            <leftValueReference>varName</leftValueReference>
-            <operator>EqualTo</operator>
-            <rightValue>
-                <stringValue>Active</stringValue>
-            </rightValue>
-        </conditions>
-        <connector>
-            <targetReference>SuccessScreen</targetReference>
-        </connector>
-        <label>Is Valid</label>
-    </rules>
-</decisions>
-```
+# **Example 3: Decision Element**
+# ```xml
+# <decisions>
+#     <name>CheckValue</name>
+#     <label>Check Value</label>
+#     <locationX>50</locationX>   <!--  REQUIRED -->
+#     <locationY>316</locationY>  <!--  REQUIRED -->
+#     <defaultConnector>
+#         <targetReference>DefaultScreen</targetReference>
+#     </defaultConnector>
+#     <rules>
+#         <name>IsValid</name>
+#         <conditionLogic>and</conditionLogic>
+#         <conditions>
+#             <leftValueReference>varName</leftValueReference>
+#             <operator>EqualTo</operator>
+#             <rightValue>
+#                 <stringValue>Active</stringValue>
+#             </rightValue>
+#         </conditions>
+#         <connector>
+#             <targetReference>SuccessScreen</targetReference>
+#         </connector>
+#         <label>Is Valid</label>
+#     </rules>
+# </decisions>
+# ```
 
-**Example 4: Variable Declaration**
-```xml
-<variables>
-    <name>userName</name>
-    <dataType>String</dataType>
-    <isInput>false</isInput>
-    <isOutput>false</isOutput>
-    <locationX>50</locationX>   <!--  REQUIRED even for variables -->
-    <locationY>474</locationY>  <!--  REQUIRED -->
-</variables>
-```
+# **Example 4: Variable Declaration**
+# ```xml
+# <variables>
+#     <name>userName</name>
+#     <dataType>String</dataType>
+#     <isInput>false</isInput>
+#     <isOutput>false</isOutput>
+#     <locationX>50</locationX>   <!--  REQUIRED even for variables -->
+#     <locationY>474</locationY>  <!--  REQUIRED -->
+# </variables>
+# ```
 
-**Example 5: Record Create**
-```xml
-<recordCreates>
-    <name>CreateAccount</name>
-    <label>Create Account</label>
-    <locationX>50</locationX>   <!--  REQUIRED -->
-    <locationY>632</locationY>  <!--  REQUIRED -->
-    <inputAssignments>
-        <field>Name</field>
-        <value>
-            <elementReference>userName</elementReference>
-        </value>
-    </inputAssignments>
-    <object>Account</object>
-</recordCreates>
-```
+# **Example 5: Record Create**
+# ```xml
+# <recordCreates>
+#     <name>CreateAccount</name>
+#     <label>Create Account</label>
+#     <locationX>50</locationX>   <!--  REQUIRED -->
+#     <locationY>632</locationY>  <!--  REQUIRED -->
+#     <inputAssignments>
+#         <field>Name</field>
+#         <value>
+#             <elementReference>userName</elementReference>
+#         </value>
+#     </inputAssignments>
+#     <object>Account</object>
+# </recordCreates>
+# ```
 
-**Example 6: Complete Multi-Screen Flow**
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>62.0</apiVersion>
+# **Example 6: Complete Multi-Screen Flow**
+# ```xml
+# <?xml version="1.0" encoding="UTF-8"?>
+# <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+#     <apiVersion>62.0</apiVersion>
     
-    <screens>
-        <name>Screen1</name>
-        <label>Input Screen</label>
-        <locationX>50</locationX>
-        <locationY>0</locationY>
-        <fields>
-            <name>nameInput</name>
-            <dataType>String</dataType>
-            <fieldText>Enter Name</fieldText>
-            <fieldType>InputField</fieldType>
-            <isRequired>true</isRequired>
-        </fields>
-        <allowBack>true</allowBack>
-        <allowFinish>true</allowFinish>
-        <allowPause>false</allowPause>
-        <connector>
-            <targetReference>Decision1</targetReference>
-        </connector>
-    </screens>
+#     <screens>
+#         <name>Screen1</name>
+#         <label>Input Screen</label>
+#         <locationX>50</locationX>
+#         <locationY>0</locationY>
+#         <fields>
+#             <name>nameInput</name>
+#             <dataType>String</dataType>
+#             <fieldText>Enter Name</fieldText>
+#             <fieldType>InputField</fieldType>
+#             <isRequired>true</isRequired>
+#         </fields>
+#         <allowBack>true</allowBack>
+#         <allowFinish>true</allowFinish>
+#         <allowPause>false</allowPause>
+#         <connector>
+#             <targetReference>Decision1</targetReference>
+#         </connector>
+#     </screens>
     
-    <decisions>
-        <name>Decision1</name>
-        <label>Check Input</label>
-        <locationX>50</locationX>
-        <locationY>158</locationY>
-        <defaultConnector>
-            <targetReference>Screen2</targetReference>
-        </defaultConnector>
-        <rules>
-            <name>HasValue</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>nameInput</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Screen3</targetReference>
-            </connector>
-            <label>Has Value</label>
-        </rules>
-    </decisions>
+#     <decisions>
+#         <name>Decision1</name>
+#         <label>Check Input</label>
+#         <locationX>50</locationX>
+#         <locationY>158</locationY>
+#         <defaultConnector>
+#             <targetReference>Screen2</targetReference>
+#         </defaultConnector>
+#         <rules>
+#             <name>HasValue</name>
+#             <conditionLogic>and</conditionLogic>
+#             <conditions>
+#                 <leftValueReference>nameInput</leftValueReference>
+#                 <operator>IsNull</operator>
+#                 <rightValue>
+#                     <booleanValue>false</booleanValue>
+#                 </rightValue>
+#             </conditions>
+#             <connector>
+#                 <targetReference>Screen3</targetReference>
+#             </connector>
+#             <label>Has Value</label>
+#         </rules>
+#     </decisions>
     
-    <screens>
-        <name>Screen2</name>
-        <label>Error Screen</label>
-        <locationX>226</locationX>
-        <locationY>158</locationY>
-        <fields>
-            <name>errorText</name>
-            <fieldText>Please provide a valid input</fieldText>
-            <fieldType>DisplayText</fieldType>
-        </fields>
-        <allowBack>true</allowBack>
-        <allowFinish>true</allowFinish>
-        <allowPause>false</allowPause>
-    </screens>
+#     <screens>
+#         <name>Screen2</name>
+#         <label>Error Screen</label>
+#         <locationX>226</locationX>
+#         <locationY>158</locationY>
+#         <fields>
+#             <name>errorText</name>
+#             <fieldText>Please provide a valid input</fieldText>
+#             <fieldType>DisplayText</fieldType>
+#         </fields>
+#         <allowBack>true</allowBack>
+#         <allowFinish>true</allowFinish>
+#         <allowPause>false</allowPause>
+#     </screens>
     
-    <screens>
-        <name>Screen3</name>
-        <label>Success Screen</label>
-        <locationX>50</locationX>
-        <locationY>316</locationY>
-        <fields>
-            <name>successText</name>
-            <fieldText>Thank you!</fieldText>
-            <fieldType>DisplayText</fieldType>
-        </fields>
-        <allowBack>true</allowBack>
-        <allowFinish>true</allowFinish>
-        <allowPause>false</allowPause>
-    </screens>
+#     <screens>
+#         <name>Screen3</name>
+#         <label>Success Screen</label>
+#         <locationX>50</locationX>
+#         <locationY>316</locationY>
+#         <fields>
+#             <name>successText</name>
+#             <fieldText>Thank you!</fieldText>
+#             <fieldType>DisplayText</fieldType>
+#         </fields>
+#         <allowBack>true</allowBack>
+#         <allowFinish>true</allowFinish>
+#         <allowPause>false</allowPause>
+#     </screens>
     
-    <label>Sample Flow</label>
-    <processType>Flow</processType>
-    <status>Draft</status>
-</Flow>
-```
+#     <label>Sample Flow</label>
+#     <processType>Flow</processType>
+#     <status>Draft</status>
+# </Flow>
+# ```
 
-SCREEN FLOW STRUCTURE REQUIREMENTS
+# SCREEN FLOW STRUCTURE REQUIREMENTS
 
-1. **processType**: Must be "Flow"
-2. **runInMode**: "SystemModeWithoutSharing" or "SystemModeWithSharing" (optional)
-3. **NO <start> element**: Screen flows don't have triggers
-4. **Screen structure**:
-   - <screens>
-     - <name> (required)
-     - <label> (required)
-     - **<locationX> (REQUIRED)**
-     - **<locationY> (REQUIRED)**
-     - <fields> (multiple allowed)
-       - <name> (required)
-       - <fieldText> (for field label text)
-       - <fieldType> (required - use DisplayText NOT Label)
-       - <dataType> (for input fields)
-       - <isRequired> (optional)
-     - <allowBack> (boolean)
-     - <allowFinish> (boolean)
-     - <allowPause> (boolean)
-     - <connector> (for navigation)
-"""
+# 1. **processType**: Must be "Flow"
+# 2. **runInMode**: "SystemModeWithoutSharing" or "SystemModeWithSharing" (optional)
+# 3. **NO <start> element**: Screen flows don't have triggers
+# 4. **Screen structure**:
+#    - <screens>
+#      - <name> (required)
+#      - <label> (required)
+#      - **<locationX> (REQUIRED)**
+#      - **<locationY> (REQUIRED)**
+#      - <fields> (multiple allowed)
+#        - <name> (required)
+#        - <fieldText> (for field label text)
+#        - <fieldType> (required - use DisplayText NOT Label)
+#        - <dataType> (for input fields)
+#        - <isRequired> (optional)
+#      - <allowBack> (boolean)
+#      - <allowFinish> (boolean)
+#      - <allowPause> (boolean)
+#      - <connector> (for navigation)
+# """
 
-elif flow_type == "Record-Triggered":
-    flow_specific_rules = """
-**RECORD-TRIGGERED FLOW CRITICAL RULES:**
+# elif flow_type == "Record-Triggered":
+#     flow_specific_rules = """
+# **RECORD-TRIGGERED FLOW CRITICAL RULES:**
 
-1. **Trigger Configuration:**
-   - <processType> must be "AutoLaunchedFlow".
-   - <start> MUST include:
-     * <object> — API name of triggering object
-     * <recordTriggerType> — Create | Update | CreateAndUpdate | Delete
-     * <triggerType> — RecordBeforeSave | RecordAfterSave
-   - Ensure <triggerType> aligns with recordTriggerType (BeforeSave → RecordBeforeSave, etc.).
+# 1. **Trigger Configuration:**
+#    - <processType> must be "AutoLaunchedFlow".
+#    - <start> MUST include:
+#      * <object> — API name of triggering object
+#      * <recordTriggerType> — Create | Update | CreateAndUpdate | Delete
+#      * <triggerType> — RecordBeforeSave | RecordAfterSave
+#    - Ensure <triggerType> aligns with recordTriggerType (BeforeSave → RecordBeforeSave, etc.).
 
-2. **Entry Criteria:**
-   - Use <filterLogic> when multiple <filters> exist.
-   - Each <filters> block requires <field>, <operator>, and <value> (wrap values in <stringValue>, <booleanValue>, or <elementReference>).
-   - Scheduled paths are NOT allowed for pure record-triggered flows.
+# 2. **Entry Criteria:**
+#    - Use <filterLogic> when multiple <filters> exist.
+#    - Each <filters> block requires <field>, <operator>, and <value> (wrap values in <stringValue>, <booleanValue>, or <elementReference>).
+#    - Scheduled paths are NOT allowed for pure record-triggered flows.
 
-3. **$Record Usage:**
-   - $Record.<Field> references are permitted throughout flow logic.
-   - Use $Record__Prior only when recordTriggerType involves Update.
-   - Never reference $Record__Prior in Create/Delete triggers.
+# 3. **$Record Usage:**
+#    - $Record.<Field> references are permitted throughout flow logic.
+#    - Use $Record__Prior only when recordTriggerType involves Update.
+#    - Never reference $Record__Prior in Create/Delete triggers.
 
-4. **Start Ordering & Connectors:**
-   - <start> must contain <locationX>, <locationY>, then <connector> before trigger metadata.
-   - <connector><targetReference> must point to the first element in the automation path.
-   - locationX/locationY required on ALL elements; follow 176px / 158px spacing guidelines.
+# 4. **Start Ordering & Connectors:**
+#    - <start> must contain <locationX>, <locationY>, then <connector> before trigger metadata.
+#    - <connector><targetReference> must point to the first element in the automation path.
+#    - locationX/locationY required on ALL elements; follow 176px / 158px spacing guidelines.
 
-5. **Common Path Elements:**
-   - <recordUpdates>, <assignments>, <decisions>, <subflows> should reference $Record fields.
-   - Validate each connector path reaches an end element (no dangling nodes).
+# 5. **Common Path Elements:**
+#    - <recordUpdates>, <assignments>, <decisions>, <subflows> should reference $Record fields.
+#    - Validate each connector path reaches an end element (no dangling nodes).
 
-6. **Common Errors to Avoid:**
-   - Missing <object> or <recordTriggerType> in <start>.
-   - Using <conditionLogic> instead of <filterLogic> inside <start>.
-   - Mismatched <triggerType> (e.g., "onAfter") — map to valid enum values.
-   - $Record__Prior referenced on non-Update triggers.
+# 6. **Common Errors to Avoid:**
+#    - Missing <object> or <recordTriggerType> in <start>.
+#    - Using <conditionLogic> instead of <filterLogic> inside <start>.
+#    - Mismatched <triggerType> (e.g., "onAfter") — map to valid enum values.
+#    - $Record__Prior referenced on non-Update triggers.
 
-**START TEMPLATE EXAMPLE:**
-```xml
-<start>
-    <locationX>0</locationX>
-    <locationY>0</locationY>
-    <connector>
-        <targetReference>FirstAssignment</targetReference>
-    </connector>
-    <object>Account</object>
-    <recordTriggerType>CreateAndUpdate</recordTriggerType>
-    <triggerType>RecordAfterSave</triggerType>
-    <filterLogic>and</filterLogic>
-    <filters>
-        <field>IsActive__c</field>
-        <operator>EqualTo</operator>
-        <value>
-            <booleanValue>true</booleanValue>
-        </value>
-    </filters>
-</start>
-```
-"""
+# **START TEMPLATE EXAMPLE:**
+# ```xml
+# <start>
+#     <locationX>0</locationX>
+#     <locationY>0</locationY>
+#     <connector>
+#         <targetReference>FirstAssignment</targetReference>
+#     </connector>
+#     <object>Account</object>
+#     <recordTriggerType>CreateAndUpdate</recordTriggerType>
+#     <triggerType>RecordAfterSave</triggerType>
+#     <filterLogic>and</filterLogic>
+#     <filters>
+#         <field>IsActive__c</field>
+#         <operator>EqualTo</operator>
+#         <value>
+#             <booleanValue>true</booleanValue>
+#         </value>
+#     </filters>
+# </start>
+# ```
+# """
 
-else:  # AutoLaunched (non-triggered)
-    flow_specific_rules = """
-**AUTOLAUNCHED FLOW CRITICAL RULES:**
+# else:  # AutoLaunched (non-triggered)
+#     flow_specific_rules = """
+# **AUTOLAUNCHED FLOW CRITICAL RULES:**
 
-1. **ProcessType:**
-    Must be "AutoLaunchedFlow"
+# 1. **ProcessType:**
+#     Must be "AutoLaunchedFlow"
 
-2. **Record Operations:**
-   - RecordLookups: Use <filterLogic> (NOT conditionLogic)
-   - Must have: name, label, object, getFirstRecordOnly, queriedFields
-   - NO duplicate names
+# 2. **Record Operations:**
+#    - RecordLookups: Use <filterLogic> (NOT conditionLogic)
+#    - Must have: name, label, object, getFirstRecordOnly, queriedFields
+#    - NO duplicate names
 
-3. **Decisions:**
-   - Use <conditionLogic> inside <rules> (NOT in recordLookups)
+# 3. **Decisions:**
+#    - Use <conditionLogic> inside <rules> (NOT in recordLookups)
 
-4. **System Variables:**
-   - $Record, $Record.Id, $Record.FieldName
-   - $Record__Prior (Update triggers only)
+# 4. **System Variables:**
+#    - $Record, $Record.Id, $Record.FieldName
+#    - $Record__Prior (Update triggers only)
 
-5. **locationX/locationY (MANDATORY):**
-   - Required for ALL elements
+# 5. **locationX/locationY (MANDATORY):**
+#    - Required for ALL elements
 
-**COMMON AUTOLAUNCHED ERRORS TO AVOID:**
- Using conditionLogic in recordLookups → Use filterLogic
- Missing <queriedFields> in recordLookups
- Duplicate recordLookups names
- Missing <object> in record operations
- Using $Record without record trigger
+# **COMMON AUTOLAUNCHED ERRORS TO AVOID:**
+#  Using conditionLogic in recordLookups → Use filterLogic
+#  Missing <queriedFields> in recordLookups
+#  Duplicate recordLookups names
+#  Missing <object> in record operations
+#  Using $Record without record trigger
 
-EXAMPLE:
-<recordLookups>
-    <name>GetRecord</name>
-    <label>Get Record</label>
-    <filterLogic>and</filterLogic>  <!-- Use filterLogic -->
-    <filters>
-        <field>Id</field>
-        <operator>EqualTo</operator>
-        <value><elementReference>recordId</elementReference></value>
-    </filters>
-    <object>Account</object>
-    <getFirstRecordOnly>true</getFirstRecordOnly>
-    <storeOutputAutomatically>true</storeOutputAutomatically>
-</recordLookups>
+# EXAMPLE:
+# <recordLookups>
+#     <name>GetRecord</name>
+#     <label>Get Record</label>
+#     <filterLogic>and</filterLogic>  <!-- Use filterLogic -->
+#     <filters>
+#         <field>Id</field>
+#         <operator>EqualTo</operator>
+#         <value><elementReference>recordId</elementReference></value>
+#     </filters>
+#     <object>Account</object>
+#     <getFirstRecordOnly>true</getFirstRecordOnly>
+#     <storeOutputAutomatically>true</storeOutputAutomatically>
+# </recordLookups>
 
-**DECISIONS** (Where conditionLogic IS valid):
-<decisions>
-    <name>CheckCondition</name>
-    <label>Check Condition</label>
-    <rules>
-        <name>outcome1</name>
-        <conditionLogic>and</conditionLogic>  <!-- Correct here -->
-        <conditions>
-            <leftValueReference>var1</leftValueReference>
-            <operator>EqualTo</operator>
-            <rightValue><stringValue>Active</stringValue></rightValue>
-        </conditions>
-        <label>If True</label>
-        <connector>
-            <targetReference>NextElement</targetReference>
-        </connector>
-    </rules>
-    <defaultConnector>
-        <targetReference>DefaultElement</targetReference>
-    </defaultConnector>
-</decisions>
+# **DECISIONS** (Where conditionLogic IS valid):
+# <decisions>
+#     <name>CheckCondition</name>
+#     <label>Check Condition</label>
+#     <rules>
+#         <name>outcome1</name>
+#         <conditionLogic>and</conditionLogic>  <!-- Correct here -->
+#         <conditions>
+#             <leftValueReference>var1</leftValueReference>
+#             <operator>EqualTo</operator>
+#             <rightValue><stringValue>Active</stringValue></rightValue>
+#         </conditions>
+#         <label>If True</label>
+#         <connector>
+#             <targetReference>NextElement</targetReference>
+#         </connector>
+#     </rules>
+#     <defaultConnector>
+#         <targetReference>DefaultElement</targetReference>
+#     </defaultConnector>
+# </decisions>
 
-"""
+# """
 
-# === Prepare final generation prompt ===
-prompt = f"""
-Generate valid Salesforce {flow_type_display} Flow XML for: "{requirement}"
+# # === Prepare final generation prompt ===
+# prompt = f"""
+# Generate valid Salesforce {flow_type_display} Flow XML for: "{requirement}"
 
-AGENT-RETRIEVED PATTERNS:
-{pattern_guidance}
+# AGENT-RETRIEVED PATTERNS:
+# {pattern_guidance}
 
-{flow_specific_rules}
+# {flow_specific_rules}
 
-CRITICAL XML VALIDATION - 7-Check Process:
+# CRITICAL XML VALIDATION - 7-Check Process:
 
-1.  Correct tag name (exact case, exists in schema)
-2.  Required children present (no missing/invented tags)
-3.  Correct parent placement (proper nesting)
-4.  Child tag order (name → label → locationX → locationY → others)
-5.  Position constraints (locationX/locationY on ALL elements)
-6.  Tag compatibility (follow co-occurrence rules)
-7.  Exact enum values (DisplayText not Label, EqualTo not equals)
-8.  Record-triggered start metadata present when applicable (<object>, <recordTriggerType>, <triggerType>)
+# 1.  Correct tag name (exact case, exists in schema)
+# 2.  Required children present (no missing/invented tags)
+# 3.  Correct parent placement (proper nesting)
+# 4.  Child tag order (name → label → locationX → locationY → others)
+# 5.  Position constraints (locationX/locationY on ALL elements)
+# 6.  Tag compatibility (follow co-occurrence rules)
+# 7.  Exact enum values (DisplayText not Label, EqualTo not equals)
+# 8.  Record-triggered start metadata present when applicable (<object>, <recordTriggerType>, <triggerType>)
 
-INTEGRATION RULES:
-- Use XML examples as structural templates
-- Apply child ordering rules EXACTLY as retrieved
-- Use ONLY retrieved valid enum values
-- Follow co-occurrence rules
-- Apply context-specific patterns
-- Respect sequence templates
-- Follow positional constraints
+# INTEGRATION RULES:
+# - Use XML examples as structural templates
+# - Apply child ordering rules EXACTLY as retrieved
+# - Use ONLY retrieved valid enum values
+# - Follow co-occurrence rules
+# - Apply context-specific patterns
+# - Respect sequence templates
+# - Follow positional constraints
 
-MANDATORY CHECKS:
-- ALL elements have locationX/locationY
-- Correct tag names for flow type (fields vs screenFields)
-- Correct field labels (fieldText vs label)
-- Valid enum values (PascalCase)
-- Proper child element ordering
-- No conflicting elements
-- Correct processType for flow type
-- Start element presence matches flow type and contains required trigger metadata
+# MANDATORY CHECKS:
+# - ALL elements have locationX/locationY
+# - Correct tag names for flow type (fields vs screenFields)
+# - Correct field labels (fieldText vs label)
+# - Valid enum values (PascalCase)
+# - Proper child element ordering
+# - No conflicting elements
+# - Correct processType for flow type
+# - Start element presence matches flow type and contains required trigger metadata
 
-OUTPUT:
-- Return ONLY XML (no markdown, no explanations)
-- Start: <?xml version="1.0" encoding="UTF-8"?>
-- Namespace: xmlns="http://soap.sforce.com/2006/04/metadata"
-- 4-space indentation
-- Schema-compliant, deployment-ready
-"""
+# OUTPUT:
+# - Return ONLY XML (no markdown, no explanations)
+# - Start: <?xml version="1.0" encoding="UTF-8"?>
+# - Namespace: xmlns="http://soap.sforce.com/2006/04/metadata"
+# - 4-space indentation
+# - Schema-compliant, deployment-ready
+# """
 
-print(f"Generating {flow_type_display} Flow XML ")
+# print(f"Generating {flow_type_display} Flow XML ")
 
-response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {
-            "role": "system",
-            "content": f"You are a Salesforce {flow_type_display} Flow XML generator. Use ALL provided patterns to ensure valid metadata structure."
-        },
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
-    temperature=0.1
-)
+# response = client.chat.completions.create(
+#     model="gpt-4o",
+#     messages=[
+#         {
+#             "role": "system",
+#             "content": f"You are a Salesforce {flow_type_display} Flow XML generator. Use ALL provided patterns to ensure valid metadata structure."
+#         },
+#         {
+#             "role": "user",
+#             "content": prompt
+#         }
+#     ],
+#     temperature=0.1
+# )
 
-xml_text = response.choices[0].message.content.strip()
+# xml_text = response.choices[0].message.content.strip()
 
-# Remove markdown if present
-if xml_text.startswith("```xml"):
-    xml_text = xml_text.split("```xml")[1].split("```")[0].strip()
-elif xml_text.startswith("```"):
-    xml_text = xml_text.split("```")[1].split("```")[0].strip()
+# # Remove markdown if present
+# if xml_text.startswith("```xml"):
+#     xml_text = xml_text.split("```xml")[1].split("```")[0].strip()
+# elif xml_text.startswith("```"):
+#     xml_text = xml_text.split("```")[1].split("```")[0].strip()
 
-print(f"\nGenerated {flow_type_display} Flow XML:\n")
-print(xml_text)
+# print(f"\nGenerated {flow_type_display} Flow XML:\n")
+# print(xml_text)
